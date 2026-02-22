@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../store/AppContext';
-import { getAnalytics } from '../services/api';
+import { useAuth, useFeatureFlags } from '../store/AppContext';
+import type { FeatureFlags } from '../store/AppContext';
+import { getAnalytics, updateFeatureFlags } from '../services/api';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, BarChart, Bar, Legend,
 } from 'recharts';
-import { Users, MessageSquare, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Users, MessageSquare, TrendingUp, AlertTriangle, ArrowRight, ToggleLeft, ToggleRight, Settings } from 'lucide-react';
 
 interface DriverMetric {
     driverId: string;
@@ -28,6 +29,8 @@ export default function AdminDashboard() {
     const [metrics, setMetrics] = useState<DriverMetric[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
+    const { featureFlags, setFeatureFlags } = useFeatureFlags();
+    const [togglingFlag, setTogglingFlag] = useState<string | null>(null);
 
     useEffect(() => {
         if (!auth.isAuthenticated) {
@@ -60,6 +63,26 @@ export default function AdminDashboard() {
         : '0.00';
 
     const totalFeedbacks = metrics.reduce((a, m) => a + m.totalFeedbackCount, 0);
+
+    const flagLabels: { key: keyof FeatureFlags; label: string; emoji: string }[] = [
+        { key: 'driverFeedback', label: 'Driver Feedback', emoji: '🚗' },
+        { key: 'tripFeedback', label: 'Trip Feedback', emoji: '🗺️' },
+        { key: 'appFeedback', label: 'App Feedback', emoji: '📱' },
+        { key: 'marshalFeedback', label: 'Marshal Feedback', emoji: '🛡️' },
+    ];
+
+    const handleToggle = async (key: keyof FeatureFlags) => {
+        setTogglingFlag(key);
+        const newValue = !featureFlags[key];
+        try {
+            const res = await updateFeatureFlags({ [key]: newValue });
+            setFeatureFlags(res.data.data);
+        } catch (err) {
+            console.error('Failed to update feature flag:', err);
+        } finally {
+            setTogglingFlag(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -97,6 +120,39 @@ export default function AdminDashboard() {
                         <p className="text-sm text-text-secondary">{stat.label}</p>
                     </div>
                 ))}
+            </div>
+
+            {/* Feature Flags Panel */}
+            <div className="rounded-2xl border border-primary/15 bg-surface-card p-6 mb-10">
+                <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-primary-light" /> Feature Flags
+                    <span className="text-xs font-normal text-text-secondary ml-2">
+                        Toggle feedback types at runtime — no code changes needed
+                    </span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {flagLabels.map((flag) => (
+                        <button
+                            key={flag.key}
+                            onClick={() => handleToggle(flag.key)}
+                            disabled={togglingFlag === flag.key}
+                            className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${featureFlags[flag.key]
+                                    ? 'border-success/30 bg-success/10 hover:bg-success/15'
+                                    : 'border-primary/15 bg-surface-elevated hover:bg-primary/10'
+                                } ${togglingFlag === flag.key ? 'opacity-50' : ''}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-xl">{flag.emoji}</span>
+                                <span className="text-sm font-medium text-text-primary">{flag.label}</span>
+                            </div>
+                            {featureFlags[flag.key] ? (
+                                <ToggleRight className="w-7 h-7 text-success" />
+                            ) : (
+                                <ToggleLeft className="w-7 h-7 text-text-secondary" />
+                            )}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Charts */}

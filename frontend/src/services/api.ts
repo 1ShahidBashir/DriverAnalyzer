@@ -36,4 +36,7 @@ export const getDriverDetail = (driverId: string) =>
 export const getFeatureFlags = () =>
     api.get('/config/features');
 
+export const updateFeatureFlags = (flags: Record<string, boolean>) =>
+    api.put('/config/features', flags);
+
 export default api;

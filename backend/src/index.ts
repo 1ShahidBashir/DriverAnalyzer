@@ -6,6 +6,7 @@ import { Database } from './config/Database';
 import { AfinnSentimentAnalyzer } from './strategies/AfinnSentimentAnalyzer';
 import { MetricsService } from './services/MetricsService';
 import { FeedbackWorker } from './queue/FeedbackWorker';
+import FeatureFlags from './models/FeatureFlags';
 import feedbackRoutes from './routes/feedbackRoutes';
 import configRoutes from './routes/configRoutes';
 import adminRoutes from './routes/adminRoutes';
@@ -36,7 +37,14 @@ async function bootstrap(): Promise<void> {
         const db = Database.getInstance();
         await db.connect();
 
-        // 2. Start the background worker with injected dependencies
+        // 2. Seed default feature flags if not present
+        const existingFlags = await FeatureFlags.findOne({ configId: 'global' });
+        if (!existingFlags) {
+            await FeatureFlags.create({ configId: 'global' });
+            console.log('[Bootstrap] Default feature flags seeded in MongoDB');
+        }
+
+        // 3. Start the background worker with injected dependencies
         const sentimentAnalyzer = new AfinnSentimentAnalyzer();
         const metricsService = new MetricsService();
         const _worker = new FeedbackWorker(sentimentAnalyzer, metricsService);
@@ -44,10 +52,11 @@ async function bootstrap(): Promise<void> {
         // 3. Start Express server using http.createServer to keep the event loop alive
         const server = http.createServer(app);
         server.listen(PORT, () => {
-            console.log(`\n🚀 Driver Sentiment Engine running on http://localhost:${PORT}`);
-            console.log(`📊 API Endpoints:`);
+            console.log(`\n Driver Sentiment Engine running on http://localhost:${PORT}`);
+            console.log(` API Endpoints:`);
             console.log(`   POST /api/feedback         → Submit feedback (202 Accepted)`);
             console.log(`   GET  /api/config/features   → Feature flags`);
+            console.log(`   PUT  /api/config/features   → Toggle feature flags (JWT required)`);
             console.log(`   POST /api/admin/login       → Admin login`);
             console.log(`   GET  /api/admin/analytics   → Driver analytics (JWT required)`);
             console.log(`   GET  /api/health            → Health check\n`);
@@ -55,7 +64,7 @@ async function bootstrap(): Promise<void> {
 
         // Graceful shutdown
         process.on('SIGINT', async () => {
-            console.log('\n🛑 Shutting down...');
+            console.log('\n Shutting down...');
             server.close();
             await db.disconnect();
             process.exit(0);

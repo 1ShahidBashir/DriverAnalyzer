@@ -221,6 +221,7 @@ The system updates driver scores using an EMA to ensure the calculation processe
 | --- | --- | --- | --- |
 | `POST` | `/api/feedback` | — | Submit driver feedback (returns 202) |
 | `GET` | `/api/config/features` | — | Feature flags for feedback forms |
+| `PUT` | `/api/config/features` | JWT | Toggle feature flags at runtime |
 | `POST` | `/api/admin/login` | — | Admin JWT login |
 | `GET` | `/api/admin/analytics` | JWT | All drivers: metrics + alerts |
 | `GET` | `/api/admin/drivers/:id` | JWT | Individual driver detail |
